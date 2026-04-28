@@ -10,7 +10,7 @@ services:
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
       - BACKEND_API_BASE_URL=http://host.docker.internal:8000
-      - N8N_WEBHOOK_SECRET=pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA
+      - N8N_WEBHOOK_SECRET=pZ7#mQ2!vL9*xR4&nG1^bT8$$jK3(mW6)fA
       - GENERIC_TIMEZONE=Asia/Manila
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=admin
