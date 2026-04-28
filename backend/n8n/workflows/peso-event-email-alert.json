@@ -1,0 +1,167 @@
+{
+  "name": "PESO Event Email Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "peso-event-email-alert",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [320, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body ?? $input.first().json;\nconst allowedTypes = ['job_fair', 'employer_of_the_day'];\n\nif (!allowedTypes.includes(payload.event_type)) {\n  throw new Error(`Unsupported event type: ${payload.event_type}`);\n}\n\nreturn [{ json: payload }];"
+      },
+      "id": "validate-event-node",
+      "name": "Validate Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{(($env.BACKEND_API_BASE_URL || 'http://host.docker.internal:8000') + '/api/events/' + $json.event_id + '?secret=' + encodeURIComponent($env.N8N_WEBHOOK_SECRET || 'pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA'))}}",
+        "responseFormat": "json",
+        "options": {},
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{$env.N8N_WEBHOOK_SECRET || 'pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA'}}"
+            }
+          ]
+        }
+      },
+      "id": "get-event-node",
+      "name": "Get Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{($env.BACKEND_API_BASE_URL || 'http://host.docker.internal:8000') + '/api/email-subscriptions?secret=' + encodeURIComponent($env.N8N_WEBHOOK_SECRET || 'pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA')}}",
+        "responseFormat": "json",
+        "options": {},
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8N-Secret",
+              "value": "={{$env.N8N_WEBHOOK_SECRET || 'pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA'}}"
+            }
+          ]
+        }
+      },
+      "id": "get-subscribers-node",
+      "name": "Get Email Subscribers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [870, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $node['Get Event'].json.data;\nconst response = $input.first().json;\nconst subscribers = response.data ?? [];\n\nconst subject = event.type === 'job_fair'\n  ? `Job Fair: ${event.title}`\n  : `Employer of the Day: ${event.title}`;\n\nconst html = `\n  <div style=\"font-family:Arial,sans-serif;line-height:1.5;color:#1f2937\">\n    <h2 style=\"margin:0 0 12px\">${subject}</h2>\n    <p style=\"margin:0 0 12px\">${event.description}</p>\n    <p style=\"margin:0 0 6px\"><strong>Date and Time:</strong> ${event.event_date}</p>\n    <p style=\"margin:0\"><strong>Type:</strong> ${event.type.replace('_', ' ')}</p>\n  </div>\n`;\n\nreturn subscribers\n  .filter((subscriber) => subscriber.email)\n  .map((subscriber) => ({\n    json: {\n      toEmail: subscriber.email,\n      subject,\n      html,\n      eventId: event.id,\n      eventType: event.type,\n    },\n  }));"
+      },
+      "id": "build-email-items-node",
+      "name": "Build Email Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1090, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "jeflyn.qcpeso@gmail.com",
+        "fromName": "PESO Quezon City",
+        "toEmail": "={{$json.toEmail}}",
+        "subject": "={{$json.subject}}",
+        "text": "={{$json.html}}",
+        "html": "={{$json.html}}"
+      },
+      "id": "send-email-node",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Event": {
+      "main": [
+        [
+          {
+            "node": "Get Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Event": {
+      "main": [
+        [
+          {
+            "node": "Get Email Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Email Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Build Email Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Items": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1"
+}
