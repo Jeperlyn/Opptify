@@ -1,0 +1,92 @@
+{
+  "name": "PESO Event Email Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "peso-event-email-alert",
+        "options": {}
+      },
+      "id": "a48b57e5-ee0e-4cf8-9f93-c3ea4089fc18",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [19296,1504],
+      "webhookId": "abbc6659-24a6-4d64-b0b5-d1c829876509"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body ?? $input.first().json;\nconst allowedTypes = ['job_fair','employer_of_the_day'];\nif(!allowedTypes.includes(payload.event_type)) throw new Error(`Unsupported event type: ${payload.event_type}`);\nreturn [{ json: payload }];"
+      },
+      "id": "adc535df-a21c-4146-b55c-20b016a2e5df",
+      "name": "Validate Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [19520,1504]
+    },
+    {
+      "parameters": {
+        "url": "={{(($env.BACKEND_API_BASE_URL || 'http://host.docker.internal:8000') + '/api/events/' + $json.event_id + '?secret=' + encodeURIComponent($env.N8N_WEBHOOK_SECRET || 'pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA'))}}",
+        "options": {}
+      },
+      "id": "54a084d2-1b71-4de4-b86b-f83dffab709f",
+      "name": "Get Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [19632,1504]
+    },
+    {
+      "parameters": {
+        "url": "={{($env.BACKEND_API_BASE_URL || 'http://host.docker.internal:8000') + '/api/email-subscriptions?secret=' + encodeURIComponent($env.N8N_WEBHOOK_SECRET || 'pZ7#mQ2!vL9*xR4&nG1^bT8$jK3(mW6)fA')}}",
+        "options": {}
+      },
+      "id": "c4f7afa9-556b-4a84-8e81-29a342ecb64e",
+      "name": "Get Email Subscribers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [19856,1504]
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $node['Get Event'].json.data;const response = $input.first().json;const subscribers = response.data ?? [];const eventDate = new Date(event.event_date);const options = { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Manila' };const formattedDate = eventDate.toLocaleDateString('en-US', options);const isJobFair = event.type === 'job_fair';const eventTypeLabel = isJobFair ? 'Job Fair' : 'Employer of the Day';function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;'); }const subject = event.title ?? '';const details = escapeHtml(event.description || '');const htmlBody = '<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body style=\"font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px;background:#f3f4f6\">' + '<p><em>' + escapeHtml(eventTypeLabel) + '</em></p>' + '<h2>' + escapeHtml(event.title) + '</h2>' + '<div style=\"white-space:pre-wrap;line-height:1.6;margin:0 0 16px 0\">' + details + '</div>' + '<p><strong>Date & Time:</strong> ' + formattedDate + '</p></body></html>';const text = eventTypeLabel + ': ' + (event.title ?? '') + '\\n' + (event.description || '') + '\\nDate & Time: ' + formattedDate;return subscribers.filter(s=>s.email).map(subscriber=>({ json: { toEmail: subscriber.email, subject, htmlBody, text, eventId: event.id, eventType: event.type } }));"
+      },
+      "id": "01de0303-b97a-4e60-acc0-c1c526faca97",
+      "name": "Build Email Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [20080,1504]
+    },
+    {
+      "parameters": {
+        "fromEmail": "jeflyn.qcpeso@gmail.com",
+        "toEmail": "={{$json.toEmail}}",
+        "subject": "={{$json.subject}}",
+        "emailFormat": "html",
+        "html": "={{$json.htmlBody}}",
+        "text": "={{$json.text}}",
+        "options": {}
+      },
+      "id": "25d0a74a-b907-42e9-ba5b-b7dbb10169eb",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [20176,1504],
+      "webhookId": "b6eff6ca-2f7d-4562-a688-bb15d580b7a1",
+      "credentials": { "smtp": { "id": "R6pgQSAfI099r3WI", "name": "SMTP account" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": { "main": [ [ { "node": "Validate Event", "type": "main", "index": 0 } ] ] },
+    "Validate Event": { "main": [ [ { "node": "Get Event", "type": "main", "index": 0 } ] ] },
+    "Get Event": { "main": [ [ { "node": "Get Email Subscribers", "type": "main", "index": 0 } ] ] },
+    "Get Email Subscribers": { "main": [ [ { "node": "Build Email Items", "type": "main", "index": 0 } ] ] },
+    "Build Email Items": { "main": [ [ { "node": "Send Email", "type": "main", "index": 0 } ] ] }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1", "binaryMode": "separate", "availableInMCP": false },
+  "versionId": "64b96a4c-c4ad-4196-a3fa-24ffaa63f37d",
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "251b9d6ed52e0b40ad4f4eac75b86476c64bb7396420da09f2dbc9b03cde5fac" },
+  "id": "DtfQ0s_eJkNDuBqeq8_av",
+  "tags": []
+}
