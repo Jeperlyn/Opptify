@@ -162,7 +162,7 @@ function CitizenPortal({ onAdminClick }) {
     <div className="layout">
       <header className="hero">
         <p className="eyebrow">Quezon City PESO</p>
-        <h1>CityJobLink Proactive Services</h1>
+        <h1>OPPTIFY</h1>
         <p className="subtitle">
           Explore program requirements, identify the right government focal person,
           and get timely alerts about local opportunities.
